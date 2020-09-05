@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="dubo_02@202.114.96.180:22">
+  <component name="PublishConfigData" autoUpload="Always" serverName="ziyechen@172.16.158.39:22">
     <serverData>
-      <paths name="dubo_02@202.114.96.180:22">
+      <paths name="ziyechen@172.16.158.39:22">
         <serverdata>
           <mappings>
-            <mapping deploy="/dat01/dubo_02/ziyechen/PCB_CSA" local="$PROJECT_DIR$" />
+            <mapping deploy="/data/ziyechen/project/PCB_CSA" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>

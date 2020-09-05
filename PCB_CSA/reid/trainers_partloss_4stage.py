@@ -34,8 +34,7 @@ class BaseTrainer(object):
             data_time.update(time.time() - end)
 
             inputs, targets = self._parse_data(inputs)
-            loss0, loss1, loss2, loss3, loss4, loss5, loss6, loss_layer1, loss_layer2, loss_layer3, loss_aux, prec1 = self._forward(inputs, targets)
-            # print(loss_aux)
+            loss0, loss1, loss2, loss3, loss4, loss5, loss6, loss_layer1, loss_layer2, loss_layer3, prec1 = self._forward(inputs, targets)
 
             # ===================================================================================
             loss_layer = (loss_layer1+loss_layer2+loss_layer3+loss6)/4
@@ -47,21 +46,6 @@ class BaseTrainer(object):
             precisions.update(prec1, targets.size(0))
 
             optimizer.zero_grad()
-
-            # if loss_aux.requires_grad:
-            #     losses_ = loss0 + loss1 + loss2 + loss3 + loss4 + loss5 + loss6 + loss_layer1 + loss_layer2 + loss_layer3 + loss_aux.mean()
-            # else:
-            #     losses_ = loss0 + loss1 + loss2 + loss3 + loss4 + loss5 + loss6 + loss_layer1 + loss_layer2 + loss_layer3
-            # losses_.backward()
-
-            # if loss_aux.requires_grad:
-            #     torch.autograd.backward([loss0, loss1, loss2, loss3, loss4, loss5, loss6, loss_layer1, loss_layer2, loss_layer3],
-            #                             [torch.ones(()).cuda(), torch.ones(()).cuda(), torch.ones(()).cuda(),torch.ones(()).cuda(),torch.ones(()).cuda(),
-            #                              torch.ones(()).cuda(), torch.ones(()).cuda(), torch.ones(()).cuda(),torch.ones(()).cuda(),torch.ones(()).cuda()])
-            # else:
-            #     torch.autograd.backward([loss0, loss1, loss2, loss3, loss4, loss5, loss6, loss_layer1, loss_layer2, loss_layer3, loss_aux],
-            #                             [torch.ones(()).cuda(), torch.ones(()).cuda(), torch.ones(()).cuda(),torch.ones(()).cuda(),torch.ones(()).cuda(),
-            #                              torch.ones(()).cuda(), torch.ones(()).cuda(), torch.ones(()).cuda(),torch.ones(()).cuda(),torch.ones(()).cuda(),torch.ones(()).cuda()])
 
             torch.autograd.backward(
                 [loss0, loss1, loss2, loss3, loss4, loss5, loss6, loss_layer1, loss_layer2, loss_layer3],
@@ -117,8 +101,6 @@ class Trainer(BaseTrainer):
             loss_layer3 = self.criterion(outputs[1][9], targets)
             prec, = accuracy(outputs[1][2].data, targets.data)
             # prec = prec[0]
-
-            loss_aux = outputs[2]
                         
         elif isinstance(self.criterion, OIMLoss):
             loss, outputs = self.criterion(outputs, targets)
@@ -128,4 +110,4 @@ class Trainer(BaseTrainer):
             loss, prec = self.criterion(outputs, targets)
         else:
             raise ValueError("Unsupported loss:", self.criterion)
-        return loss0, loss1, loss2, loss3, loss4, loss5, loss6, loss_layer1,loss_layer2,loss_layer3, loss_aux, prec
+        return loss0, loss1, loss2, loss3, loss4, loss5, loss6, loss_layer1,loss_layer2,loss_layer3, prec

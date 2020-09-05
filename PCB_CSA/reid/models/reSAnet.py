@@ -8,7 +8,6 @@ from torch.nn import init
 from torch.nn import functional as F
 
 
-
 class ConvBlock(nn.Module):
     """Basic convolutional block:
     convolution + batch normalization + relu.
@@ -29,227 +28,24 @@ class ConvBlock(nn.Module):
         return F.relu(self.bn(self.conv(x)))
 
 
-class SelfAttn(nn.Module):
-    """ Self attention Layer"""
-
-    def __init__(self, in_dim, **kwargs):
-        super(SelfAttn, self).__init__()
-        self.chanel_in = in_dim
-
-        self.query_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1)
-        self.key_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1)
-        self.value_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
-        self.gamma = nn.Parameter(torch.zeros(1))
-
-        self.softmax = nn.Softmax(dim=-1)
-
-    def forward(self, x, mode=0):
-        """
-            inputs :
-                x : input feature maps( B X C X W X H)
-            returns :
-                out : self attention value + input feature
-                attention: B X N X N (N is Width*Height)
-        """
-        m_batchsize, C, width, height = x.size()
-        proj_query = self.query_conv(x).view(m_batchsize, -1, width * height).permute(0, 2, 1)  # B X CX(N)
-        proj_key = self.key_conv(x).view(m_batchsize, -1, width * height)  # B X C x (*W*H)
-        energy = torch.bmm(proj_query, proj_key)  # transpose check
-        attention = self.softmax(energy)  # BX (N) X (N)
-        proj_value = self.value_conv(x).view(m_batchsize, -1, width * height)  # B X C X N
-
-        out = torch.bmm(proj_value, attention.permute(0, 2, 1))
-        out = out.view(m_batchsize, C, width, height)
-
-        
-        if mode == 0:
-            out = self.gamma * out + x                                       # (b, c, h, w)
-        elif mode == 1:
-            out = out * x                                                    # (b, c, h, w)
-        else:
-            out = (self.gamma * out + x, out * x)
-        return out
-
-
-# class SelfAttn2(nn.Module):
-#     """ Self attention Layer"""
-#
-#     def __init__(self, in_dim, **kwargs):
-#         super(SelfAttn2, self).__init__()
-#         self.chanel_in = in_dim
-#
-#         self.query_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1)
-#         self.key_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1)
-#         self.value_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
-#         self.gamma = nn.Parameter(torch.zeros(1))
-#         self.softmax = nn.Softmax(dim=-1)
-#         self.sample = 500
-#
-#     def forward(self, x, mode=0):
-#         """
-#             inputs :
-#                 x : input feature maps( B X C X W X H)
-#             returns :
-#                 out : self attention value + input feature
-#                 attention: B X N X N (N is Width*Height)
-#         """
-#         b, c, h, w = x.size()
-#         Q = self.query_conv(x).view(b, -1, h * w)                   # B X  C X HW
-#         K = self.key_conv(x).view(b, -1, h * w)                     # B X  C x HW
-#         V = self.value_conv(x).view(b, -1, h * w)                   # B X  C X HW
-#         I = torch.randperm(h * w, device=x.device)[:self.sample]    # M
-#         q = torch.index_select(Q, dim=-1, index=I)                  # B X  C X  M
-#         k = torch.index_select(K, dim=-1, index=I)                  # B X  C X  M
-#         A = torch.exp(torch.bmm(Q.permute(0, 2, 1), k))             # B X HW X  M
-#         B = torch.exp(torch.bmm(q.permute(0, 2, 1), k))             # B X  M X  M
-#         C = torch.exp(torch.bmm(q.permute(0, 2, 1), K))             # B X  M X HW
-#
-#         B = torch.inverse(B)                                        # B X  M X  M
-#
-#         O = torch.bmm(V, C.permute(0, 2, 1))                        # B X  C X  M
-#         O = torch.bmm(O, B.permute(0, 2, 1))                        # B X  C X  M
-#         O = torch.bmm(O, A.permute(0, 2, 1))                        # B X  C X HW
-#         D = torch.sum(C, dim=-1, keepdim=True)                      # B X  M X  1
-#         D = torch.bmm(B, D)                                         # B X  M X  1
-#         D = torch.bmm(A, D)                                         # B X HW X  1
-#         O = O / D.permute(0, 2, 1)                                  # B X  C X HW
-#         out = O.view(b, c, h, w)
-#
-#         if mode == 0:
-#             out = self.gamma * out + x  # (b, c, h, w)
-#         elif mode == 1:
-#             out = out * x  # (b, c, h, w)
-#         else:
-#             out = (self.gamma * out + x, out * x)
-#         return out, torch.zeros(1, device=x.device)
-
-
-# class SelfAttn2(nn.Module):
-#     """ Self attention Layer"""
-#
-#     def __init__(self, in_dim, centr_num=32, group_num=1, **kwargs):
-#         super(SelfAttn2, self).__init__()
-#         self.centr_num  = centr_num
-#         self.group_num  = group_num
-#         self.query_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 4, kernel_size=1)
-#         self.key_conv   = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 4, kernel_size=1)
-#         self.value_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
-#         self.out_conv   = nn.Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
-#         self.weight = nn.Parameter(torch.empty(centr_num * group_num, in_dim // 4 // group_num, 1))
-#         self.gamma  = nn.Parameter(torch.zeros(1))
-#         self.scale  = 14.0
-#         nn.init.orthogonal_(self.weight, gain=1)
-#         print(self.centr_num, self.group_num)
-#
-#     def forward(self, x, mode=0):
-#         """
-#             inputs :
-#                 x : input feature maps( B X C X W X H)
-#             returns :
-#                 out : self attention value + input feature
-#                 attention: B X N X N (N is Width*Height)
-#         """
-#         b, c, h, w = x.size()
-#         g = self.group_num
-#         b1 = b * g
-#         W = self.weight
-#         Q = self.query_conv(x).view(b1, -1, h * w)                  # B X  C X HW
-#         K = self.key_conv(x).view(b1, -1, h * w)                    # B X  C x HW
-#         V = self.value_conv(x).view(b1, -1, h * w)                  # B X  C X HW
-#         Q = F.normalize(Q, dim=1).view(b, -1, h * w)                # B X  C X HW
-#         K = F.normalize(K, dim=1).view(b, -1, h * w)                # B X  C X HW
-#         W = F.normalize(W, dim=1)                                   # M*G X C X 1
-#
-#         M_q = F.conv1d(Q, W, groups=g).view(b1, -1, h * w) * self.scale  # B X  M X HW
-#         M_k = F.conv1d(K, W, groups=g).view(b1, -1, h * w) * self.scale  # B X  M X HW
-#         A_q = F.softmax(M_q, dim=1)                                 # B X  M X HW
-#         A_k = F.softmax(M_k, dim=2)                                 # B X  M X HW
-#
-#         O   = torch.bmm(V, A_k.permute(0, 2, 1))                    # B X  C X M
-#         O   = torch.bmm(O, A_q)                                     # B X  C X HW
-#         out = O.view(b, c, h, w)
-#
-#         if mode == 0:
-#             out = self.gamma * out + x  # (b, c, h, w)
-#         elif mode == 1:
-#             out = out * x  # (b, c, h, w)
-#         else:
-#             out = (self.gamma * out + x, out * x)
-#         return out, torch.zeros(1, device=x.device)
-
-
-# class SelfAttn2(nn.Module):
-#     """ Self attention Layer"""
-#
-#     def __init__(self, in_dim, centr_num=32, group_num=1, **kwargs):
-#         super(SelfAttn2, self).__init__()
-#         self.centr_num  = centr_num
-#         self.group_num  = group_num
-#         self.query_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 4, kernel_size=1)
-#         self.key_conv   = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 4, kernel_size=1)
-#         self.value_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
-#         self.out_conv   = nn.Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
-#         self.weight = nn.Parameter(torch.empty(centr_num * group_num, in_dim // 4 // group_num, 1))
-#         self.gamma  = nn.Parameter(torch.zeros(1))
-#         self.scale  = 14.0
-#         nn.init.orthogonal_(self.weight, gain=1)
-#         print(self.centr_num, self.group_num)
-#         print("!!!!!!!!")
-#
-#     def forward(self, x, mode=0):
-#         """
-#             inputs :
-#                 x : input feature maps( B X C X W X H)
-#             returns :
-#                 out : self attention value + input feature
-#                 attention: B X N X N (N is Width*Height)
-#         """
-#         b, c, h, w = x.size()
-#         g = self.group_num
-#         b1 = b * g
-#         W = self.weight
-#         Q = self.query_conv(x).view(b1, -1, h * w)                  # B X  C X HW
-#         V = self.value_conv(x).view(b1, -1, h * w)                  # B X  C X HW
-#         Q = F.normalize(Q, dim=1).view(b, -1, h * w)                # B X  C X HW
-#         W = F.normalize(W, dim=1)                                   # M*G X C X 1
-#
-#         M = F.conv1d(Q, W, groups=g).view(b1, -1, h * w) * self.scale  # B X  M X HW
-#         C = F.softmax(M, dim=1)                                     # B X  M X HW
-#         A = F.softmax(M, dim=2)                                     # B X  M X HW
-#
-#         O = torch.bmm(V, A.permute(0, 2, 1))                        # B X  C X M
-#         O = torch.bmm(O, C)                                         # B X  C X HW
-#
-#         out = O.view(b, c, h, w)
-#
-#         if mode == 0:
-#             out = self.gamma * out + x  # (b, c, h, w)
-#         elif mode == 1:
-#             out = out * x  # (b, c, h, w)
-#         else:
-#             out = (self.gamma * out + x, out * x)
-#         return out, torch.zeros(1, device=x.device)
-
-
 class SelfAttn2(nn.Module):
     """ Self attention Layer"""
 
-    def __init__(self, in_dim, centr_num=32, group_num=1, **kwargs):
+    def __init__(self, in_dim, centr_num=32, group_num=2, gamma=False, **kwargs):
         super(SelfAttn2, self).__init__()
         self.centr_num  = centr_num
         self.group_num  = group_num
         self.query_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 4, kernel_size=1)
-        self.key_conv   = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 4, kernel_size=1)
         self.value_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
         self.out_conv   = nn.Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
-        self.weight = nn.Parameter(torch.empty(centr_num * group_num, in_dim // 4 // group_num, 1))
-        self.gamma  = nn.Parameter(torch.zeros(1))
+        self.weight = nn.Parameter(torch.empty(centr_num * group_num, in_dim // 4, 1, 1))
+        self.gamma  = nn.Parameter(torch.zeros(1)) if gamma else None
         self.scale  = 14.0
         nn.init.orthogonal_(self.weight, gain=1)
         print(self.centr_num, self.group_num)
-        print("##########!!")
+        print("##########")
 
-    def forward(self, x, mode=0):
+    def forward(self, x):
         """
             inputs :
                 x : input feature maps( B X C X W X H)
@@ -261,37 +57,24 @@ class SelfAttn2(nn.Module):
         g, m = self.group_num, self.centr_num
         b1 = b * g
         W = self.weight
-        Q = self.query_conv(x).view(b1, -1, h * w)                  # B X  C X HW
-        K = self.key_conv(x).view(b1, -1, h * w)                    # B X  C X HW
-        V = self.value_conv(x).view(b1, -1, h * w)                  # B X  C X HW
-        Q = F.normalize(Q, dim=1).view(b, -1, h * w)                # B X  C X HW
-        W = F.normalize(W, dim=1)                                   #MG X C  X 1
+        V = self.value_conv(x).view(b1, -1, h * w)                  #BG X  C X HW
+        Q = self.query_conv(x)                                      # B X  C X H X W
+        Q = F.normalize(Q, dim=1)                                   # B X  C X H X W
+        W = F.normalize(W, dim=1)                                   #GM X  C X 1 X 1
 
-        C = F.conv1d(Q, W, groups=g).view(b1, -1, h * w) * self.scale  # B X  M X HW
-        A = F.conv1d(K, W, groups=g).view(b1, -1, h * w) * self.scale  # B X  M X HW
-        C = F.softmax(C, dim=1)                                     # B X  M X HW
-        A = F.softmax(A, dim=2)                                     # B X  M X HW
-
-        W = W.view(g, m, -1)                                        # G X  M X  C
-        B = torch.bmm(W, W.permute(0, 2, 1)) * self.scale           # G X  M X  M
-        B = F.softmax(B, dim=2)                                     # G X  M X  M
-        B = torch.inverse(B)                                        # G X  M X  M
-        B = B.repeat(b, 1, 1)                                       # B X  M X  M
+        M = F.conv2d(Q, W).view(b1, -1, h * w) * self.scale         #BG X  M X HW
+        C = F.softmax(M, dim=1)                                     #BG X  M X HW
+        A = F.softmax(M, dim=2)                                     #BG X  M X HW
 
         O = torch.bmm(V, A.permute(0, 2, 1))                        # B X  C X M
-        O = torch.bmm(O, B.permute(0, 2, 1))                        # B X  C X M
         O = torch.bmm(O, C)                                         # B X  C X HW
 
-        out = O.view(b, c, h, w)
-
-        if mode == 0:
-            out = self.gamma * out + x  # (b, c, h, w)
-        elif mode == 1:
-            out = out * x  # (b, c, h, w)
+        O = O.view(b, c, h, w)
+        O = self.out_conv(O)
+        if self.gamma is not None:
+            return self.gamma * O + x
         else:
-            out = (self.gamma * out + x, out * x)
-        return out, torch.zeros(1, device=x.device)
-
+            return O
 
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
@@ -341,14 +124,14 @@ class ResNet(nn.Module):
         init.kaiming_normal_(self.local_conv_layer2.weight, mode='fan_out')
         init.kaiming_normal_(self.local_conv_layer3.weight, mode='fan_out')
 
-        #       init.constant_(self.local_conv.bias,0)
+        # init.constant_(self.local_conv.bias,0)
         self.feat_bn2d = nn.BatchNorm2d(self.num_features)  # may not be used, not working on caffe
         init.constant_(self.feat_bn2d.weight, 1)  # initialize BN, may not be used
         init.constant_(self.feat_bn2d.bias, 0)  # iniitialize BN, may not be used
 
         # self.offset = ConvOffset2D(256)
 
-        self.SA0 = SelfAttn2(out_planes1)
+        self.SA0 = SelfAttn2(out_planes1, gamma=True)
         self.SA1 = SelfAttn2(out_planes1)
         self.SA2 = SelfAttn2(out_planes2)
         self.SA3 = SelfAttn2(out_planes3)
@@ -415,21 +198,14 @@ class ResNet(nn.Module):
         for name, module in self.base._modules.items():
             if name == 'avgpool':
                 break
+            x = module(x)
             if name == 'layer1':
-                x = module[0](x)
-                x = module[1](x)
-                x, loss0 = self.SA0(x, 0)
-                x = module[2](x)
-            else:
-                x = module(x)
-            if name == 'layer1':
-                x_layer1, loss1 = self.SA1(x, 1)
+                x_layer1 = self.SA1(x)
+                x = self.SA0(x)
             if name == 'layer2':
-                x_layer2, loss2 = self.SA2(x, 1)
+                x_layer2 = self.SA2(x)
             if name == 'layer3':
-                x_layer3, loss3 = self.SA3(x, 1)
-
-        loss = (loss0 + loss1 + loss2 + loss3) / 4.0
+                x_layer3 = self.SA3(x)
 
         # Deep Supervision
         x_layer1 = F.avg_pool2d(x_layer1, kernel_size=(96, 32), stride=(1, 1))
@@ -476,7 +252,7 @@ class ResNet(nn.Module):
         c3 = self.instance3(x3)
         c4 = self.instance4(x4)
         c5 = self.instance5(x5)
-        return out0, (c0, c1, c2, c3, c4, c5, c6, x_layer1, x_layer2, x_layer3), loss
+        return out0, (c0, c1, c2, c3, c4, c5, c6, x_layer1, x_layer2, x_layer3)
 
     def reset_params(self):
         for m in self.modules():
